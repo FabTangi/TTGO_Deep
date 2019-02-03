@@ -41,7 +41,7 @@
 #include <U8x8lib.h>
 // the OLED used
 // pins defined in TTGO variant, pins_arduino.h
-U8X8_SSD1306_128X64_NONAME_SW_I2C u8x8(/* clock=*/ OLED_SCL, /* data=*/ OLED_SDA, /* reset=*/ OLED_RST);
+U8X8_SSD1306_128X64_NONAME_SW_I2C u8x8(/* clock=*/ 22, /* data=*/ 21, /* reset=*/ OLED_RST);
 
 
 // T-Beam specific hardware
