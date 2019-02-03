@@ -25,11 +25,6 @@
  * Multiple devices can use the same AppEUI, but each device has its own
  * DevEUI and AppKey.
  *
- *
- *It seems that internal température is not available anymore :
- *https://www.esp32.com/viewtopic.php?t=5875
- * 
- *
  *******************************************************************************/
 
 #include <lmic.h>
@@ -90,8 +85,8 @@ state_t curState;
  */
 void displayState (const char* state) {
 
-  //u8x8.clearLine (2);
-  //u8x8.drawString (0,2,state);
+  u8x8.clearLine (2);
+  u8x8.drawString (0,2,state);
 
   Serial.println(state);
 }
@@ -99,31 +94,23 @@ void displayState (const char* state) {
 /** display number of packets send & received
  */
 void displayStats (state_t* st) {
-  char l[17];
+  char l[7];
   uint8_t n = 4;
 
   /* packets */
   sprintf (l, "s: %5d r:%5d", st->total_snd, st->total_rcv);
-  l[16] = 0;
+  l[6] = 0;
 
-//  u8x8.clearLine (n);
- // u8x8.drawString (0,n++, l);
+  u8x8.clearLine (n);
+  u8x8.drawString (0,n++, l);
 
   Serial.println (l);
   // RSSI & SNR
   sprintf (l, "RSSI%4d SNR%4d", st->rssi, st->snr);
-  l[16] = 0;
+  l[6] = 0;
 
-//  u8x8.clearLine (n);
- // u8x8.drawString (0,n++, l);
-
-  Serial.println (l);
-  // gps & antenas
-  sprintf (l, "Sat: %2d  GWs:%3d", st->ant);
-  l[16] = 0;
-
-  //u8x8.clearLine (n);
-  //u8x8.drawString (0,n++, l);
+  u8x8.clearLine (n);
+  u8x8.drawString (0,n++, l);
 
   Serial.println (l);
 
@@ -250,7 +237,6 @@ void do_send(osjob_t* j) {
   // Next TX is scheduled after TX_COMPLETE event.
 }
 
-
 void setup() {
   Serial.begin(115200);
   Serial.println(F("Deep Sleep Tester"));
@@ -272,9 +258,13 @@ void setup() {
 
   // init oled screen
   u8x8.begin();
-  u8x8.setFont(u8x8_font_chroma48medium8_r);
-  u8x8.drawString(0, 1, "TTN Deep_Sleep Test");
-
+  u8x8.setFont(u8x8_font_amstrad_cpc_extended_f);    
+  u8x8.clear();
+  u8x8.inverse();
+  u8x8.print("Deep_Sleep Test");
+  u8x8.setFont(u8x8_font_chroma48medium8_r);  
+  u8x8.noInverse();
+  u8x8.setCursor(0,1);
 
   pinMode(vbatPin, INPUT);
   #ifdef VCC_ENABLE
