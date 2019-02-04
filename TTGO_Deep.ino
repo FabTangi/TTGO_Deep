@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2018 Tangi Lavanant
+ * Copyright (c) 2018 FabLab Lannion
  *
  * Permission is hereby granted, free of charge, to anyone
  * obtaining a copy of this document and accompanying files,
@@ -64,19 +64,21 @@ const unsigned TX_INTERVAL = 60;
 const lmic_pinmap lmic_pins = {
   .nss = 18,
   .rxtx = LMIC_UNUSED_PIN,
-  .rst = LMIC_UNUSED_PIN, // was "14,"
+  .rst = LMIC_UNUSED_PIN, 
   .dio = {26, 33, 32},
 };
 
 
 typedef struct state {
   uint16_t total_snd = 0; /**< total packets send */
-  uint16_t total_rcv = 0; /**< total packets received (excluding ack) */  
+  uint16_t total_rcv = 0; /**< total packets received (excluding ack) */
+  uint8_t gps = 0; /**< nb gps sat */
   int8_t rssi = 0; /**< last RSSI received value */
   int8_t snr = 0; /**< last snr received value */
   uint8_t ant = 0; /**< number of last seen gateways */
 
 } state_t;
+
 
 state_t curState;
 
@@ -94,12 +96,13 @@ void displayState (const char* state) {
 /** display number of packets send & received
  */
 void displayStats (state_t* st) {
-  char l[7];
+  char l[17];
   uint8_t n = 4;
-
+  
+  Serial.println (l);
   /* packets */
   sprintf (l, "s: %5d r:%5d", st->total_snd, st->total_rcv);
-  l[6] = 0;
+  l[16] = 0;
 
   u8x8.clearLine (n);
   u8x8.drawString (0,n++, l);
@@ -107,7 +110,15 @@ void displayStats (state_t* st) {
   Serial.println (l);
   // RSSI & SNR
   sprintf (l, "RSSI%4d SNR%4d", st->rssi, st->snr);
-  l[6] = 0;
+  l[16] = 0;
+
+  u8x8.clearLine (n);
+  u8x8.drawString (0,n++, l);
+  
+  Serial.println (l);
+  // gps & antenas
+  sprintf (l, "Sat: %2d  GWs:%3d", st->gps, st->ant);
+  l[16] = 0;
 
   u8x8.clearLine (n);
   u8x8.drawString (0,n++, l);
@@ -152,8 +163,12 @@ void onEvent (ev_t ev) {
       displayState("EV_TXCOMPLETE");
       digitalWrite(BUILTIN_LED, LOW);
         curState.total_snd++;
-          curState.rssi = LMIC.rssi;
-          curState.snr = LMIC.snr;
+        curState.rssi = LMIC.rssi;
+        curState.snr = LMIC.snr;
+        Serial.println(curState.total_snd);
+        Serial.println(curState.rssi);
+        Serial.println(curState.snr);
+        Serial.println(LMIC.txpow+"dBm);
       if (LMIC.txrxFlags & TXRX_ACK) {
         Serial.println(F("Received Ack"));
       }
@@ -162,7 +177,8 @@ void onEvent (ev_t ev) {
         Serial.println(s);
         sprintf(s, "RSSI %d SNR %.1d", LMIC.rssi, LMIC.snr);
         Serial.println(s);
-      curState.total_rcv++;
+        curState.total_rcv++;
+        Serial.println(curState.total_rcv);
       }
     displayStats (&curState);
      // Schedule next transmission
@@ -275,15 +291,56 @@ void setup() {
   #endif
   // LMIC init
   os_init();
+
   // Reset the MAC state. Session and pending data transfers will be discarded.
   LMIC_reset();
 
+/*
+  // On AVR, these values are stored in flash and only copied to RAM
+  // once. Copy them to a temporary buffer here, LMIC_setSession will
+  // copy them into a buffer of its own again.
+  uint8_t appskey[sizeof(LMIC.artKey)];
+  uint8_t nwkskey[sizeof(LMIC.nwkKey)];
+  memcpy_P(appskey, LMIC.artKey, sizeof(LMIC.artKey));
+  memcpy_P(nwkskey, LMIC.nwkKey, sizeof(LMIC.nwkKey));
+  LMIC_setSession (0x1, LMIC.devaddr, nwkskey, appskey);
+  */
+  LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
+  // Set up the channels used by the Things Network, which corresponds
+  // to the defaults of most gateways. Without this, only three base
+  // channels from the LoRaWAN specification are used, which certainly
+  // works, so it is good for debugging, but can overload those
+  // frequencies, so be sure to configure the full frequency range of
+  // your network here (unless your network autoconfigures them).
+  // Setting up channels should happen after LMIC_setSession, as that
+  // configures the minimal channel set.
+
+  LMIC_setupChannel(0, 868100000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
+  LMIC_setupChannel(1, 868300000, DR_RANGE_MAP(DR_SF12, DR_SF7B), BAND_CENTI);      // g-band
+  LMIC_setupChannel(2, 868500000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
+  LMIC_setupChannel(3, 867100000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
+  LMIC_setupChannel(4, 867300000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
+  LMIC_setupChannel(5, 867500000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
+  LMIC_setupChannel(6, 867700000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
+  LMIC_setupChannel(7, 867900000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
+  LMIC_setupChannel(8, 868800000, DR_RANGE_MAP(DR_FSK,  DR_FSK),  BAND_MILLI);      // g2-band
+  // TTN defines an additional channel at 869.525Mhz using SF9 for class B
+  // devices' ping slots. LMIC does not have an easy way to define set this
+  // frequency and support for class B is spotty and untested, so this
+  // frequency is not configured here.
+
+  // Disable link check validation
+  LMIC_setLinkCheckMode(0);
+
+  // TTN uses SF9 for its RX2 window.
+  LMIC.dn2Dr = DR_SF9;
 
   // Set data rate and transmit power for uplink (note: txpow seems to be ignored by the library)
-  LMIC_setDrTxpow(DR_SF7,14);
+  //LMIC_setDrTxpow(DR_SF11,14);
+  LMIC_setDrTxpow(DR_SF9,14);
 
   // Start job (sending automatically starts OTAA too)
-  do_send(&sendjob);
+do_send(&sendjob); 
   pinMode(BUILTIN_LED, OUTPUT);
   digitalWrite(BUILTIN_LED, LOW);
 
